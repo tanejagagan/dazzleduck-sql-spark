@@ -55,20 +55,13 @@ public class QueryBuilderV2 {
         return "SELECT %s FROM \n(%s) \n%s \n%s \n%s".formatted(selectClause, inner, whereClause, groupByClause, limitClause);
     }
 
-    private static String buildSource(
-            DatasourceOptions options,
-            StructType partitionSchema
-    ) {
+    private static String buildSource(DatasourceOptions options, StructType partitionSchema) {
 
     /* ===============================
        DuckLake: table-based
        =============================== */
         if (options.sourceType() == DatasourceOptions.SourceType.DUCKLAKE) {
-            return "%s.%s.%s".formatted(
-                    options.catalog(),
-                    options.schema(),
-                    options.table()
-            );
+            return "%s.%s.%s".formatted(options.catalog(), options.schema(), options.table());
         }
 
     /* ===============================
@@ -82,15 +75,10 @@ public class QueryBuilderV2 {
 
         String partition = "/*".repeat(options.partitionColumns().size()) + "/*.parquet";
 
-        var hiveTypes =
-                stream(partitionSchema.fields())
-                        .map(f -> "%s:%s".formatted(
-                                f.name(),
-                                DuckDBExpressionSQLBuilder.translateDataType(f.dataType())
-                        ))
+        var hiveTypes = stream(partitionSchema.fields())
+                        .map(f -> "%s:%s".formatted(f.name(), DuckDBExpressionSQLBuilder.translateDataType(f.dataType())))
                         .collect(Collectors.joining(","));
 
-        return "read_parquet('%s%s', hive_types={%s}, union_by_name=true)"
-                .formatted(path, partition, hiveTypes);
+        return "read_parquet('%s%s', hive_types={%s}, union_by_name=true)".formatted(path, partition, hiveTypes);
     }
 }
