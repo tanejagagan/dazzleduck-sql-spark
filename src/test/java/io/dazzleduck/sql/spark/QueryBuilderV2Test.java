@@ -22,7 +22,7 @@ public class QueryBuilderV2Test {
     public void testWithoutAggregation() throws SQLException, IOException {
         var datasourceSchema = (StructType) DataType.fromDDL( "key string, value string, p string");
         var partitionSchema = (StructType) DataType.fromDDL("p string");
-        var datasourceOptions =new DatasourceOptions("localhost", null, "example/data/parquet/kv", List.of("p"), Duration.ofMinutes(10), new Properties());
+        var datasourceOptions = new DatasourceOptions("localhost", null, "example/data/parquet/kv", List.of("p"), Duration.ofMinutes(10), new Properties(), DatasourceOptions.SourceType.HIVE, null, null, null);
         var outputSchema = (StructType) DataType.fromDDL("key string");
         var predicateChildren = new Expression[] {
                 new LiteralValue<>(UTF8String.fromString("v2"), DataType.fromDDL("string")),

@@ -55,21 +55,42 @@ public class QueryBuilderV2 {
         return "SELECT %s FROM \n(%s) \n%s \n%s \n%s".formatted(selectClause, inner, whereClause, groupByClause, limitClause);
     }
 
-    private static String buildSource(DatasourceOptions datasourceOptions, StructType partitionSchema) {
-        var partitionColumn = datasourceOptions.partitionColumns();
-        var path = datasourceOptions.path();
-        if (partitionColumn.isEmpty()) {
-            return "read_parquet('%s')".formatted(datasourceOptions.path());
-        } else {
-            String partition = "/*".repeat(datasourceOptions.partitionColumns().size()) +
-                    "/*.parquet";
-            var hiveTypes =
-                    stream(partitionSchema.fields()).map(f -> {
-                        var dataType = DuckDBExpressionSQLBuilder.translateDataType(f.dataType());
-                        return "%s:%s".formatted(f.name(), dataType);
+    private static String buildSource(
+            DatasourceOptions options,
+            StructType partitionSchema
+    ) {
 
-                    }).collect(Collectors.joining(","));
-            return "read_parquet('%s%s', hive_types = {%s}, union_by_name=True)".formatted(path, partition, hiveTypes);
+    /* ===============================
+       DuckLake: table-based
+       =============================== */
+        if (options.sourceType() == DatasourceOptions.SourceType.DUCKLAKE) {
+            return "%s.%s.%s".formatted(
+                    options.catalog(),
+                    options.schema(),
+                    options.table()
+            );
         }
+
+    /* ===============================
+       Hive: file-based
+       =============================== */
+        var path = options.path();
+
+        if (options.partitionColumns().isEmpty()) {
+            return "read_parquet('%s')".formatted(path);
+        }
+
+        String partition = "/*".repeat(options.partitionColumns().size()) + "/*.parquet";
+
+        var hiveTypes =
+                stream(partitionSchema.fields())
+                        .map(f -> "%s:%s".formatted(
+                                f.name(),
+                                DuckDBExpressionSQLBuilder.translateDataType(f.dataType())
+                        ))
+                        .collect(Collectors.joining(","));
+
+        return "read_parquet('%s%s', hive_types={%s}, union_by_name=true)"
+                .formatted(path, partition, hiveTypes);
     }
 }

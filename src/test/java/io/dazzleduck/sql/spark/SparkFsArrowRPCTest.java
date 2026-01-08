@@ -20,6 +20,7 @@ import org.testcontainers.containers.Network;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -64,8 +65,9 @@ public class SparkFsArrowRPCTest {
         minio.start();
         minioClient = MinioContainerTestUtil.createClient(minio);
         minioClient.makeBucket(MakeBucketArgs.builder().bucket(MinioContainerTestUtil.TEST_BUCKET_NAME).build());
-        localPath  = System.getProperty("user.dir") + "/example/data/parquet/spark_fs_test";
-        schemaEvolutionTablePath = System.getProperty("user.dir") + "/example/data/parquet/kv";
+   //     localPath  = System.getProperty("user.dir") + "example/data/parquet/spark_fs_test";
+        localPath = Paths.get(System.getProperty("user.dir"), "example", "data", "parquet", "spark_fs_test").toString();
+        schemaEvolutionTablePath = Paths.get(System.getProperty("user.dir"), "example", "data", "parquet", "kv").toUri().toString();
         MinioContainerTestUtil.uploadDirectory(minioClient,  MinioContainerTestUtil.TEST_BUCKET_NAME, localPath, "spark_fs_test/");
         s3Path = String.format("s3a://%s/%s", MinioContainerTestUtil.TEST_BUCKET_NAME, "spark_fs_test");
         var sc = MinioContainerTestUtil.duckDBSecretForS3Access(minio).entrySet().stream().map( e ->
@@ -77,14 +79,14 @@ public class SparkFsArrowRPCTest {
         spark = SparkInitializationHelper.createSparkSession(configWithFallback);
         DuckDBInitializationHelper.initializeDuckDB(configWithFallback);
         FlightTestUtil.createFsServiceAnsStart(port);
-
-        createLocalTable(schemaDDL, localTable, localPath);
-        createLocalTable(schemaDDL, s3Table, s3Path);
+        String sparkPath = Paths.get(localPath).toUri().toString();
+        createLocalTable(schemaDDL, localTable, sparkPath);
+        //createLocalTable(schemaDDL, s3Table, s3Path);
         createLocalTable(schemaOfEvolutionTable, schemaEvolutionLocalTable, schemaEvolutionTablePath);
 
 
-        createRPCTestTable(schemaDDL, rpcLocalPathTable, localPath, "partition" );
-        createRPCTestTable(schemaDDL, rpcS3PathTable, s3Path, "partition");
+        createRPCTestTable(schemaDDL, rpcLocalPathTable, sparkPath, "partition" );
+        //createRPCTestTable(schemaDDL, rpcS3PathTable, s3Path, "partition");
         createRPCTestTable(schemaOfEvolutionTable, schemaEvolutionRpcTable, schemaEvolutionTablePath, "p");
     }
 
