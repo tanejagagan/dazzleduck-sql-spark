@@ -54,29 +54,27 @@ SELECT * FROM t;
 
 ## Working with DuckLake
 
+### 1. Start the DazzleDuck Server
 
+Launch the DazzleDuck server :
 
-### 1. Install and Load DuckLake Extension,Using the mounted data directory:
-#### Run these commands in your startup script.
-```sql
-INSTALL ducklake;
-LOAD ducklake;
-ATTACH 'ducklake:/warehouse/data' AS my_data (DATA_PATH '/warehouse/data');
-CREATE TABLE my_data.main.demo (key STRING,value STRING,partition INT);
-ALTER TABLE my_data.main.demo SET PARTITIONED BY (partition);
-INSERT INTO my_data.main.demo VALUES('k00', 'v00', 0),('k01', 'v01', 0),('k51', 'v51', 1),('k61', 'v61', 1);
+```bash
+docker run -ti -v "$PWD/StartUpScript.sql:/startup/StartUpScript.sql" -p 59307:59307 -p 8080:8080 dazzleduck/dazzleduck --conf warehouse=/warehouse --conf startup_script_provider.script_location=/startup/StartUpScript.sql
+
 ```
+
+
 
 
 ## Querying DuckLake Tables via Spark SQL
 
-### 1. Start Spark SQL
+### 2. Start Spark SQL
 
 ```bash
 bin/spark-sql --packages io.dazzleduck.sql:dazzleduck-sql-spark:0.0.4
 ```
 
-### 2. Create a Temporary View for DuckLake
+### 3. Create a Temporary View for DuckLake
 
 At the Spark SQL prompt:
 
@@ -93,7 +91,7 @@ OPTIONS (
 );
 ```
 
-### 3. Query the Table
+### 4. Query the Table
 
 ```sql
 SELECT * FROM t;
