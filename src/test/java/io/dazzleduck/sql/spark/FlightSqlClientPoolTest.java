@@ -2,14 +2,15 @@ package io.dazzleduck.sql.spark;
 
 import com.typesafe.config.ConfigFactory;
 import io.dazzleduck.sql.common.Headers;
+import io.dazzleduck.sql.flight.server.Main;
 import org.apache.arrow.driver.jdbc.ArrowFlightConnection;
 import org.apache.arrow.flight.FlightCallHeaders;
 import org.apache.arrow.flight.FlightInfo;
+import org.apache.arrow.flight.FlightServer;
 import org.apache.arrow.flight.HeaderCallOption;
 import org.apache.arrow.flight.sql.FlightSqlClient;
 import org.junit.jupiter.api.*;
 
-import java.lang.reflect.Field;
 import java.nio.file.Paths;
 import java.util.Map;
 
@@ -25,13 +26,27 @@ public class FlightSqlClientPoolTest {
             "jdbc:arrow-flight-sql://localhost:%s?useEncryption=false&disableCertificateVerification=true&user=admin&password=admin",
             PORT);
     private static String testPath;
+    private static FlightServer server;
 
     @BeforeAll
     public static void setup() throws Exception {
         testPath = Paths.get(System.getProperty("user.dir"), "example", "data", "parquet", "spark_fs_test").toString();
         var config = ConfigFactory.load();
         DuckDBInitializationHelper.initializeDuckDB(config);
-        FlightTestUtil.createFlightServiceAndStart(PORT);
+
+        server = Main.createServer(new String[]{
+                "--conf", "dazzleduck_server.flight_sql.port=" + PORT,
+                "--conf", "dazzleduck_server.flight_sql.use_encryption=false",
+                "--conf", "dazzleduck_server.access_mode=RESTRICTED"
+        });
+        server.start();
+    }
+
+    @AfterAll
+    public static void cleanup() throws Exception {
+        if (server != null) {
+            server.close();
+        }
     }
 
     @BeforeEach

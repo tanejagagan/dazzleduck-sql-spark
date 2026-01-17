@@ -2,11 +2,13 @@ package io.dazzleduck.sql.spark;
 
 import com.typesafe.config.ConfigFactory;
 import io.dazzleduck.sql.common.Headers;
+import io.dazzleduck.sql.flight.server.Main;
 import io.dazzleduck.sql.flight.server.auth2.AuthUtils;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import org.apache.arrow.flight.FlightCallHeaders;
 import org.apache.arrow.flight.FlightClient;
+import org.apache.arrow.flight.FlightServer;
 import org.apache.arrow.flight.HeaderCallOption;
 import org.apache.arrow.flight.Location;
 import org.apache.arrow.flight.sql.FlightSqlClient;
@@ -51,6 +53,7 @@ public class SparkFsArrowRPCTest {
 
     private static SparkSession spark;
     private static MinioClient minioClient;
+    private static FlightServer server;
     private static String localPath;
     private static String s3Path;
     private static String schemaEvolutionTablePath;
@@ -81,7 +84,13 @@ public class SparkFsArrowRPCTest {
 
         spark = SparkInitializationHelper.createSparkSession(configWithFallback);
         DuckDBInitializationHelper.initializeDuckDB(configWithFallback);
-        FlightTestUtil.createFlightServiceAndStart(PORT);
+
+        server = Main.createServer(new String[]{
+                "--conf", "dazzleduck_server.flight_sql.port=" + PORT,
+                "--conf", "dazzleduck_server.flight_sql.use_encryption=false",
+                "--conf", "dazzleduck_server.access_mode=RESTRICTED"
+        });
+        server.start();
 
         String sparkPath = Paths.get(localPath).toUri().toString();
         createLocalTable(SCHEMA_DDL, LOCAL_TABLE, sparkPath);
@@ -219,6 +228,9 @@ public class SparkFsArrowRPCTest {
     public static void stopAll() throws Exception {
         if (spark != null) {
             spark.close();
+        }
+        if (server != null) {
+            server.close();
         }
         if (minio != null && minio.isRunning()) {
             minio.stop();

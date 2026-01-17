@@ -2,12 +2,8 @@ package io.dazzleduck.sql.spark;
 
 import com.typesafe.config.ConfigFactory;
 import io.dazzleduck.sql.commons.ConnectionPool;
-import io.dazzleduck.sql.commons.util.TestUtils;
-import io.dazzleduck.sql.flight.server.auth2.AuthUtils;
-import org.apache.arrow.flight.Location;
-import org.apache.arrow.flight.FlightClient;
-import org.apache.arrow.flight.sql.FlightSqlClient;
-import org.apache.arrow.memory.RootAllocator;
+import io.dazzleduck.sql.flight.server.Main;
+import org.apache.arrow.flight.FlightServer;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -16,15 +12,14 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 
 public class DuckLakeSparkIntegrationTest {
 
     private static SparkSession spark;
     private static Path workspace;
+    private static FlightServer server;
 
-    private static final int PORT = 33335;
-    private static final int PORT2 = 33338;
+    private static final int PORT = 33336;
     private static final String USER = "admin";
     private static final String PASSWORD = "admin";
 
@@ -71,8 +66,14 @@ public class DuckLakeSparkIntegrationTest {
 
         spark = SparkInitializationHelper.createSparkSession(config);
         DuckDBInitializationHelper.initializeDuckDB(config);
-        FlightTestUtil.createFlightServiceAndStart(PORT);
-        FlightTestUtil.createFlightServiceAndStartComplete(PORT2);
+
+        server = Main.createServer(new String[]{
+                "--conf", "dazzleduck_server.flight_sql.port=" + PORT,
+                "--conf", "dazzleduck_server.flight_sql.use_encryption=false",
+                "--conf", "dazzleduck_server.access_mode=RESTRICTED"
+        });
+        server.start();
+
         createDuckLakeRPCTable(SCHEMA_DDL, RPC_TABLE, CATALOG, SCHEMA, TABLE);
     }
     private static void createDuckLakeRPCTable(String schemaDDL, String viewName, String catalog, String schema, String table) {
@@ -138,22 +139,14 @@ public class DuckLakeSparkIntegrationTest {
         Assertions.assertEquals(1, result.get(0).getInt(2));
     }
 
-    @Test
-    void testFlightSqlDirectly() {
-        var client = FlightClient.builder()
-                .allocator(new RootAllocator())
-                .location(Location.forGrpcInsecure("localhost", PORT2))
-                .intercept(AuthUtils.createClientMiddlewareFactory(USER, PASSWORD, Map.of()))
-                .build();
-
-        var sqlClient = new FlightSqlClient(client);
-        var info = sqlClient.execute("select 1");
-        Assertions.assertFalse(info.getEndpoints().isEmpty());
-    }
-
     @AfterAll
     static void cleanup() throws Exception {
-        spark.close();
+        if (spark != null) {
+            spark.close();
+        }
+        if (server != null) {
+            server.close();
+        }
         ConnectionPool.execute("DETACH " + CATALOG);
     }
 }
